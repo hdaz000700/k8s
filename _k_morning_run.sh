@@ -17,6 +17,25 @@ function  _blank_line () {
     _blank_line
     kubectl get service --all-namespaces | grep --color=auto -i ingress
     kubectl get pods --all-namespaces | grep --color=auto -i ingress
+    # kubectl get ing --all-namespaces
+    # Traefik Ingress https://doc.traefik.io/traefik/providers/kubernetes-ingress
+    #
+    _blank_line
+
+    # CRI-O
+    # kubectl top pods -A | grep -i crio
+    # crio config | grep enable_pod_events
+
+    echo "___ network ___"
+    _blank_line
+    kubectl get networkpolicies --all-namespaces
+    _blank_line
+
+    # Network Policy Provider - Antrea - Calico - Cilium - Kube-router - Romana - Weave Net
+
+    echo "___ cert-manager ___" #https://github.com/cert-manager/cert-manager   https://cert-manager.io/docs/troubleshooting
+    _blank_line
+    kubectl get certificate --all-namespaces
     _blank_line
 
     echo "___ configmaps ___"
@@ -59,9 +78,12 @@ function  _blank_line () {
     kubectl get pods -o json --all-namespaces | jq .items[].spec.containers[].image | sort | uniq
 
     _blank_line
-    echo "___ get storage pvc ___"
+    echo "__ get storage persistentvolumes ___"
+    kubectl get persistentvolumes -o wide
     _blank_line
-    kubectl get pvc --all-namespaces -o wide
+    echo "___ get storage persistentvolumeclaims ___"
+    _blank_line
+    kubectl get persistentvolumeclaims --all-namespaces -o wide
     _blank_line
 
     echo "___ get statefulsets ___"
@@ -133,14 +155,31 @@ function  _blank_line () {
 
     echo "___ lists all published API kinds available ___ "
     _blank_line
-    kubectl api-resources
-    echo " "
+    kubectl api-resources -o wide
+    _blank_line
+
+    echo "___ get roles ___"
+    _blank_line
+    kubectl get roles
+    _blank_line
+
+    echo "___ get rolebindings ___"
+    _blank_line
+    kubectl get rolebindings --all-namespaces -o wide
+    _blank_line
+
+    echo "___ get default namespace  ___"
+    _blank_line
+    kubectl get pods --namespace default
+    _blank_line
 
     echo "___ check for port-forwards ___ "
-    echo " "
+    _blank_line
+    kubectl get pod --all-namespaces -o json | jq -r '.items[] | select(.spec.containers[].command | contains(["port-forward"])) | .metadata.namespace + "/" + .metadata.name' 2>/dev/null || echo "No port-forwards found."
     _blank_line
 
     echo "___ check deprecated apis ___ "
     _blank_line
     kubectl get --raw /metrics | grep --color=auto apiserver_requested_deprecated_apis
     _blank_line
+    

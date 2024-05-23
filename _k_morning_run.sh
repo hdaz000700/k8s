@@ -121,6 +121,11 @@ function  _blank_line () {
     kubectl get secrets --all-namespaces
     _blank_line
 
+    echo "___ virtualservices ___ "
+    _blank_line
+    kubectl get virtualservices --all-namespaces
+    _blank_line
+
     echo "___ flux ___ "
     _blank_line
     flux stats
@@ -134,14 +139,29 @@ function  _blank_line () {
     # flux logs --kind kustomization -A
     _blank_line
 
-    echo "___ flux events ___ "
+    echo "___ flux events  ___"
     _blank_line
     flux events
     _blank_line
 
-    echo "___ flux helm ___ "
+    echo "___ flux helm  ___"
     _blank_line
     helm list --failed --all-namespaces
+    # helm ls -a --all-namespaces
+    _blank_line
+
+    echo "___ helm manifests  ___"
+    _blank_line
+    namespaces=$( kubectl get namespaces -o=jsonpath='{.items[*].metadata.name}' )
+    for namespace in $namespaces; do
+        echo "Namespace: $namespace"
+        releases=$( helm list -n $namespace -q )
+
+        for release in $releases; do
+            echo "Release: $release"
+            helm history -n $namespace $release
+        done
+    done
     _blank_line
 
     echo "___ constraints Enforcement-Action and Violations ___ "
@@ -149,9 +169,94 @@ function  _blank_line () {
     kubectl get constraints
     _blank_line
 
-    echo "___ istio gateway logs ___"
-    kubectl -n istio-system logs $(kubectl -n istio-system get pods -listio=ingressgateway -o=jsonpath={.items[0].metadata.name}) --tail=1000
+### ISTIO
+    echo "___ istio pods  ___ "
     _blank_line
+    kubectl get pod -n istio-system
+    _blank_line
+
+    echo "___ istio gateway ip and node port  ___ "
+    _blank_line
+    _GATEWAY_URL=$(kubectl get po -l istio=ingressgateway -n istio-system -o 'jsonpath={.items[0].status.hostIP}'):$(kubectl get svc istio-ingressgateway -n istio-system -o 'jsonpath={.spec.ports[0].nodePort}')
+    echo "${_GATEWAY_URL}"
+    _blank_line
+
+    echo "___ istio gateway logs summary ___ "
+    echo "10000 lines"
+    _ISTIO_LOGS=$( kubectl -n istio-system logs $(kubectl -n istio-system get pods -listio=ingressgateway -o=jsonpath={.items[0].metadata.name}) --tail=10000 )
+    echo "${_ISTIO_LOGS}" | head -1
+    echo "${_ISTIO_LOGS}" | tail -1
+    _blank_line
+    echo "info messages"
+    echo "${_ISTIO_LOGS}" | grep -i "info" | wc -l
+    _blank_line
+    echo "error messages"
+    echo "${_ISTIO_LOGS}" | grep -i "error" | wc -l
+    _blank_line
+
+    echo "___ istio gateway logs ___"
+    echo "${_ISTIO_LOGS}"
+    _blank_line
+
+    echo "___ istio analyze  ___ "
+    _blank_line
+    istioctl analyze --all-namespaces
+    _blank_line
+
+    echo "___ istio proxy-status ___"
+    _blank_line
+    istioctl proxy-status
+    _blank_line
+
+    echo "___ istio proxy-config cluster  ___"
+    _ISTIO_GATEWAY=$( kubectl get pods -n istio-system | grep -i istio-ingressgateway | grep -i Running | awk '{ print $1 }' | head -1 )
+    _blank_line
+    istioctl proxy-config cluster -n istio-system "${_ISTIO_GATEWAY}"
+    _blank_line
+
+    echo "___ istio ingressgateway ps aux  ___"
+    _blank_line
+    kubectl -n istio-system exec "${_ISTIO_GATEWAY}" ps aux
+    _blank_line
+
+    echo "___ istio proxy-config cluster   ___"
+    _blank_line
+    istioctl -n istio-system proxy-config cluster "${_ISTIO_GATEWAY}"
+    _blank_line
+
+    echo "___ istio proxy-config endpoint   ___"
+    _blank_line
+    istioctl -n istio-system proxy-config endpoint "${_ISTIO_GATEWAY}"
+    _blank_line
+
+    echo "___ istio proxy-config listener  ___"
+    _blank_line
+    istioctl -n istio-system proxy-config listener "${_ISTIO_GATEWAY}"
+    _blank_line
+
+    echo "___ istio proxy-config route  ___"
+    _blank_line
+    istioctl -n istio-system proxy-config route "${_ISTIO_GATEWAY}"
+    _blank_line
+
+    echo "___ istio proxy-config secret  ___"
+    _blank_line
+    istioctl -n istio-system proxy-config secret "${_ISTIO_GATEWAY}"
+    _blank_line
+
+    echo "___ istio pods versions  ___"
+    _blank_line
+    _PODS=$( kubectl get pods --all-namespaces | grep -i Running | awk '{ print $1, $2 }' )
+    echo "${_PODS}" | grep -v -i -E "aad-pod-identity|kube-system|calico-system|istio-system|istio-operator" | parallel -j10 --colsep ' ' '
+    namespace={1}
+    pod={2}
+    echo " "
+    echo "_____________ $namespace $pod _____________"
+    echo " "
+    kubectl describe pod $pod -n $namespace | grep -n -i "istio" | grep -i "Image:" '
+    _blank_line
+
+### ISTIO END
 
     echo "___ lists all published API kinds available ___ "
     _blank_line
@@ -182,4 +287,3 @@ function  _blank_line () {
     _blank_line
     kubectl get --raw /metrics | grep --color=auto apiserver_requested_deprecated_apis
     _blank_line
-    
